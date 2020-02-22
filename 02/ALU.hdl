@@ -42,5 +42,85 @@ CHIP ALU {
         ng; // 1 if (out < 0),  0 otherwise
 
     PARTS:
-   // Put you code here:
+        /*
+            X is x or 0
+            mux16 chip selects if out  = a or b
+            where a = x and b = 0
+        */
+        Mux16(a=x,  sel=zx, out=x1);
+        Not16(in=x1, out=negatedx1);
+
+        /*
+            ndx is either x or !x
+            mux chip selects with nx if out  = a or !b
+            where a=x or b = !x
+        */
+        Mux16(a=x1, b=negatedx1, sel=nx, out=ndx);
+
+        /*
+            Y is y or 0
+            mux16 chip selects if out  = a or b
+            where a = y and b = 0
+        */
+        Mux16(a=y,  sel=zy, out=y1);
+        Not16(in=y1, out=negatedy1);
+
+         /*
+            ndy is either y or !y
+            mux chip selects with ny if out  = a or !b
+            where a=y or b = !y
+        */
+        Mux16(a=y1, b=negatedy1, sel=ny, out=ndy);
+       
+      
+        Add16(a=ndx, b=ndy, out=addxy);// x+y
+        And16(a=ndx, b=ndy, out=andxy);// x&y
+
+        /*
+            selects x+y or x&y depending on if the selector f is either HIGH or LOW
+        
+        */
+        Mux16(a=andxy, b=addxy, sel=f, out=fxy);
+        Not16(in=fxy,out=nfxy);      
+
+        /*
+            selects out or !out depending on if the selector no is HIGH or LOW
+            we have a lot of variables referencing different bits of the output pin of this chip
+
+            leftout and rightout is an 8 bit split of the 16 bit out pin.
+            this is cause we have an 8wayor we can use to sum all the bits of the two 8 bit digits
+
+            
+        */
+        Mux16(a=fxy,b=nfxy,sel=no, out=out, out[15]=highestOutBit, out[0..7]=leftout, out[8..15]=rightout);  //we are splitting the result into 2 8bit digits becuase we have an 8 way or and not a 16 way or
+
+
+        /*
+
+            To Find zr we need to add all the bits of leftout and rightout.
+            this is a 2 step process
+
+            after summing the bits of leftout and rightout, we then sum out1 and out2
+            if the result of out1 and out2 is zero
+            it then means that leftout and rightout is zero
+
+            and zr=1 when out = 0
+            so we do a negation of the final out to get zr
+
+            we also have a variable reference the leftmost bit of the 16 bit out. now the leftmostbit represent's the signed bit so we need that to know if a value is positive or negative
+        */
+        Or8Way(in=leftout, out=out1);
+        Or8Way(in=rightout, out=out2);
+
+        Or(a=out1, b=out2, out=out3);
+        Not(in=out3, out=zr);
+        
+
+        /*
+            now from the 2's complement section we know that the leftmost bit is the signed bit
+            the and chip will only give ng a HIGH value when the highestOutBit indicates that the number is negative,
+            otherwise ng is LOW when the highestOutBit indicates that the number is positive
+        */
+        And(a=highestOutBit, b=true, out=ng);
+
 }
